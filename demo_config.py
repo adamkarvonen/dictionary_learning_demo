@@ -13,6 +13,7 @@ from dictionary_learning.trainers.jumprelu import JumpReluTrainer
 from dictionary_learning.trainers.matroyshka_batch_top_k import (
     MatroyshkaBatchTopKTrainer,
     MatroyshkaBatchTopKSAE,
+    apply_temperature,
 )
 from dictionary_learning.dictionary import (
     AutoEncoder,
@@ -49,7 +50,7 @@ class SparsityPenalties:
     gated: list[float]
 
 
-num_tokens = 500_000_000
+num_tokens = 200_000_000
 eval_num_inputs = 200
 random_seeds = [0]
 dictionary_widths = [2**14]
@@ -60,7 +61,7 @@ DECAY_START_FRACTION = 0.8
 
 learning_rates = [3e-4]
 
-wandb_project = "pythia-160m-sweep"
+wandb_project = "weighting_experiment"
 
 LLM_CONFIG = {
     "EleutherAI/pythia-70m-deduped": LLMConfig(
@@ -201,8 +202,23 @@ def get_trainer_configs(
     warmup_steps: int = WARMUP_STEPS,
     sparsity_warmup_steps: int = SPARSITY_WARMUP_STEPS,
     decay_start_fraction=DECAY_START_FRACTION,
+    matroyshka_temperature: Optional[float] = None,
 ) -> list[dict]:
     decay_start = int(steps * decay_start_fraction)
+
+    if matroyshka_temperature is not None:
+        group_weights = [
+            (1 / 32),
+            (1 / 16),
+            (1 / 8),
+            (1 / 4),
+            ((1 / 2) + (1 / 32)),
+        ]
+
+        group_weights = apply_temperature(group_weights, matroyshka_temperature)
+    else:
+        group_weights = None
+        matroyshka_temperature = 1000
 
     trainer_configs = []
 
@@ -328,7 +344,8 @@ def get_trainer_configs(
                 dict_size=dict_size,
                 seed=seed,
                 k=k,
-                wandb_name=f"MatroyshkaBatchTopKTrainer-{model_name}-{submodule_name}",
+                group_weights=group_weights,
+                wandb_name=f"{matroyshka_temperature}_MatroyshkaBatchTopKTrainer-{model_name}-{submodule_name}",
             )
             trainer_configs.append(asdict(config))
 

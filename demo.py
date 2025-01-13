@@ -7,6 +7,7 @@ import random
 import json
 import torch.multiprocessing as mp
 import time
+from typing import Optional
 
 import demo_config
 from dictionary_learning.utils import hf_dataset_to_generator
@@ -22,6 +23,7 @@ def get_args():
     parser.add_argument("--use_wandb", action="store_true", help="use wandb logging")
     parser.add_argument("--dry_run", action="store_true", help="dry run sweep")
     parser.add_argument("--save_checkpoints", action="store_true", help="save checkpoints")
+    parser.add_argument("--temperature", type=float, help="temperature for training")
     parser.add_argument(
         "--layers", type=int, nargs="+", required=True, help="layers to train SAE on"
     )
@@ -58,6 +60,7 @@ def run_sae_training(
     use_wandb: bool = False,
     save_checkpoints: bool = False,
     buffer_tokens: int = 250_000,
+    temperature: Optional[float] = None,
 ):
     random.seed(demo_config.random_seeds[0])
     t.manual_seed(demo_config.random_seeds[0])
@@ -122,10 +125,13 @@ def run_sae_training(
         layer,
         submodule_name,
         steps,
+        matroyshka_temperature=temperature,
     )
 
     print(f"len trainer configs: {len(trainer_configs)}")
     assert len(trainer_configs) > 0
+    if temperature is not None:
+        save_dir = f"{save_dir}_temp_{temperature}"
     save_dir = f"{save_dir}/{submodule_name}"
 
     if not dry_run:
@@ -268,6 +274,7 @@ if __name__ == "__main__":
             dry_run=args.dry_run,
             use_wandb=args.use_wandb,
             save_checkpoints=args.save_checkpoints,
+            temperature=args.temperature,
         )
 
     ae_paths = utils.get_nested_folders(save_dir)
