@@ -9,6 +9,7 @@ import torch.multiprocessing as mp
 import time
 import huggingface_hub
 from datasets import config
+from transformers import GPTNeoXForCausalLM, AutoTokenizer
 
 import demo_config
 from dictionary_learning.utils import hf_dataset_to_generator
@@ -45,6 +46,24 @@ def get_args():
     parser.add_argument("--hf_repo_id", type=str, help="Hugging Face repo ID to push results to")
     args = parser.parse_args()
     return args
+
+
+def copy_weights(source_model, target_model):
+    """
+    Copy weights from source model to target model, handling the slight structural differences
+    between HuggingFace and LanguageModel implementations.
+    """
+    # Create state dict mapping
+    source_state = source_model.state_dict()
+    target_state = target_model.state_dict()
+
+    # Copy matching parameters
+    for target_key in target_state:
+        if target_key in source_state:
+            target_state[target_key].copy_(source_state[target_key])
+
+    # Load the updated state dict
+    target_model.load_state_dict(target_state)
 
 
 def run_sae_training(
@@ -92,8 +111,31 @@ def run_sae_training(
     else:
         save_steps = None
 
+    hf_model = GPTNeoXForCausalLM.from_pretrained(
+        model_name,
+        revision="step0",
+        cache_dir="./pythia-1b/step0",
+    ).to(device, dtype=dtype)
+
     model = LanguageModel(model_name, dispatch=True, device_map=device)
     model = model.to(dtype=dtype)
+
+    input_text = "Hello, my dog is a"
+    inputs = model.tokenizer(input_text, return_tensors="pt").to(device)
+
+    # Get outputs from both models
+    output1 = hf_model(**inputs).logits
+    output2 = model.forward(**inputs).logits
+
+    print(f"Original output: {output2}")
+
+    copy_weights(hf_model, model)
+
+    del hf_model
+
+    output3 = model.forward(**inputs).logits
+    assert t.allclose(output1, output3, atol=1e-3)
+
     submodule = utils.get_submodule(model, layer)
     submodule_name = f"resid_post_layer_{layer}"
     io = "out"

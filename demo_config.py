@@ -51,7 +51,7 @@ class SparsityPenalties:
 
 # So we are forced to set num_tokens before running this script
 num_tokens = None
-# num_tokens = 500_000_000
+num_tokens = 100_000_000
 eval_num_inputs = 200
 random_seeds = [0]
 dictionary_widths = [2**14]
@@ -71,6 +71,9 @@ LLM_CONFIG = {
     "EleutherAI/pythia-160m-deduped": LLMConfig(
         llm_batch_size=32, context_length=1024, sae_batch_size=2048, dtype=t.float32
     ),
+    "EleutherAI/pythia-1b": LLMConfig(
+        llm_batch_size=4, context_length=1024, sae_batch_size=2048, dtype=t.bfloat16
+    ),
     "google/gemma-2-2b": LLMConfig(
         llm_batch_size=4, context_length=1024, sae_batch_size=2048, dtype=t.bfloat16
     ),
@@ -84,7 +87,7 @@ SPARSITY_PENALTIES = SparsityPenalties(
 )
 
 
-TARGET_L0s = [20, 40, 80, 160, 320, 640]
+TARGET_L0s = [20, 40, 80, 160]
 
 
 @dataclass
