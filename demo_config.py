@@ -4,7 +4,10 @@ from enum import Enum
 import torch as t
 import itertools
 
-from dictionary_learning.trainers.standard import StandardTrainer, StandardTrainerAprilUpdate
+from dictionary_learning.trainers.standard import (
+    StandardTrainer,
+    StandardTrainerAprilUpdate,
+)
 from dictionary_learning.trainers.top_k import TopKTrainer, AutoEncoderTopK
 from dictionary_learning.trainers.batch_top_k import BatchTopKTrainer, BatchTopKSAE
 from dictionary_learning.trainers.gdm import GatedSAETrainer
@@ -49,13 +52,13 @@ class SparsityPenalties:
     gated: list[float]
 
 
-num_tokens = 50_000_000
+num_tokens = 200_000_000
 
 print(f"NOTE: Training on {num_tokens} tokens")
 
 eval_num_inputs = 200
 random_seeds = [0]
-dictionary_widths = [2**14]
+dictionary_widths = [2**14, 2**16]
 
 WARMUP_STEPS = 1000
 SPARSITY_WARMUP_STEPS = 5000
@@ -63,7 +66,7 @@ DECAY_START_FRACTION = 0.8
 
 learning_rates = [3e-4]
 
-wandb_project = "pythia-160m-sweep"
+wandb_project = "ministral-8b-sweep"
 
 LLM_CONFIG = {
     "EleutherAI/pythia-70m-deduped": LLMConfig(
@@ -75,6 +78,9 @@ LLM_CONFIG = {
     "google/gemma-2-2b": LLMConfig(
         llm_batch_size=4, context_length=1024, sae_batch_size=2048, dtype=t.bfloat16
     ),
+    "mistralai/Ministral-8B-Instruct-2410": LLMConfig(
+        llm_batch_size=128, context_length=1024, sae_batch_size=8192, dtype=t.bfloat16
+    ),
 }
 
 SPARSITY_PENALTIES = SparsityPenalties(
@@ -85,7 +91,7 @@ SPARSITY_PENALTIES = SparsityPenalties(
 )
 
 
-TARGET_L0s = [20, 40, 80, 160, 320, 640]
+TARGET_L0s = [80, 160]
 
 
 @dataclass

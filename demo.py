@@ -20,10 +20,14 @@ import dictionary_learning.utils as utils
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--save_dir", type=str, required=True, help="where to store sweep")
+    parser.add_argument(
+        "--save_dir", type=str, required=True, help="where to store sweep"
+    )
     parser.add_argument("--use_wandb", action="store_true", help="use wandb logging")
     parser.add_argument("--dry_run", action="store_true", help="dry run sweep")
-    parser.add_argument("--save_checkpoints", action="store_true", help="save checkpoints")
+    parser.add_argument(
+        "--save_checkpoints", action="store_true", help="save checkpoints"
+    )
     parser.add_argument(
         "--layers", type=int, nargs="+", required=True, help="layers to train SAE on"
     )
@@ -41,8 +45,12 @@ def get_args():
         required=True,
         help="which SAE architectures to train",
     )
-    parser.add_argument("--device", type=str, default="cuda:0", help="device to train on")
-    parser.add_argument("--hf_repo_id", type=str, help="Hugging Face repo ID to push results to")
+    parser.add_argument(
+        "--device", type=str, default="cuda:0", help="device to train on"
+    )
+    parser.add_argument(
+        "--hf_repo_id", type=str, help="Hugging Face repo ID to push results to"
+    )
     args = parser.parse_args()
     return args
 
@@ -60,7 +68,7 @@ def run_sae_training(
     dry_run: bool = False,
     use_wandb: bool = False,
     save_checkpoints: bool = False,
-    buffer_tokens: int = 250_000,
+    buffer_tokens: int = 1_000_000,
 ):
     random.seed(demo_config.random_seeds[0])
     t.manual_seed(demo_config.random_seeds[0])
@@ -99,7 +107,8 @@ def run_sae_training(
     io = "out"
     activation_dim = model.config.hidden_size
 
-    generator = hf_dataset_to_generator("monology/pile-uncopyrighted")
+    # generator = hf_dataset_to_generator("monology/pile-uncopyrighted")
+    generator = hf_dataset_to_generator("EleutherAI/fineweb-edu-dedup-10b")
 
     activation_buffer = ActivationBuffer(
         generator,
@@ -276,7 +285,11 @@ if __name__ == "__main__":
 
     start_time = time.time()
 
-    save_dir = f"{args.save_dir}_{args.model_name}_{'_'.join(args.architectures)}".replace("/", "_")
+    save_dir = (
+        f"{args.save_dir}_{args.model_name}_{'_'.join(args.architectures)}".replace(
+            "/", "_"
+        )
+    )
 
     for layer in args.layers:
         run_sae_training(

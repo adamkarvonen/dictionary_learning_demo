@@ -18,6 +18,8 @@ The bottom of `demo.py` contains a variety of example commands for training a va
 
 `python demo.py --save_dir ./saes --model_name EleutherAI/pythia-70m-deduped --layers 3 --architectures standard jump_relu batch_top_k top_k gated`
 
+`python demo.py --save_dir ./saes --model_name mistralai/Ministral-8B-Instruct-2410 --layers 18 --architectures batch_top_k`
+
 We currently support the following SAEs:
 
 - ReLU (Towards Monosemanticity, aka `standard`)
