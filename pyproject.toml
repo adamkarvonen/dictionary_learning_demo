@@ -25,7 +25,9 @@ dependencies = [
     "torchvision==0.20.1",
     "wandb>=0.12.0",
     "pytest>=6.2.4",
-    "transformers>=4.47.1"
+    "transformers>=4.47.1",
+    "ipykernel>=6.29.5"
+
 ]
 
 [tool.pyright]
