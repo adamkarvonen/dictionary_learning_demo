@@ -60,8 +60,8 @@ eval_num_inputs = 200
 random_seeds = [0]
 dictionary_widths = [2**14, 2**16]
 
-WARMUP_STEPS = 10
-SPARSITY_WARMUP_STEPS = 50
+WARMUP_STEPS = 1000
+SPARSITY_WARMUP_STEPS = 5000
 DECAY_START_FRACTION = 0.8
 
 learning_rates = [5e-5]
@@ -79,6 +79,9 @@ LLM_CONFIG = {
         llm_batch_size=4, context_length=1024, sae_batch_size=2048, dtype=t.bfloat16
     ),
     "mistralai/Ministral-8B-Instruct-2410": LLMConfig(
+        llm_batch_size=4, context_length=1024, sae_batch_size=8192, dtype=t.bfloat16
+    ),
+    "mistralai/Mistral-Small-24B-Instruct-2501": LLMConfig(
         llm_batch_size=4, context_length=1024, sae_batch_size=8192, dtype=t.bfloat16
     ),
 }

@@ -100,7 +100,10 @@ def run_sae_training(
     activation_dim = AutoConfig.from_pretrained(model_name).hidden_size
 
     BUCKET_NAME = os.environ.get("S3_BUCKET_NAME", "main")
-    s3_prefix = ["mistral.8b.fineweb/blocks.9.hook_resid_post"]
+    s3_prefix = [
+        f"mistral.8b.fineweb/blocks.{layer}.hook_resid_post",
+        f"mistral.8b.lmsys/blocks.{layer}.hook_resid_post",
+    ]
     cache = S3RCache.from_credentials(
         aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
         aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
