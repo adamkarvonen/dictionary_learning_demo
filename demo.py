@@ -66,6 +66,15 @@ def get_args():
     parser.add_argument(
         "--mixed_dataset", action="store_true", help="use mixed dataset"
     )
+    parser.add_argument(
+        "--target_l0s", type=int, nargs="+", help="target L0 values"
+    )
+    parser.add_argument(
+        "--dictionary_widths", type=int, nargs="+", help="dictionary widths"
+    )
+    parser.add_argument(
+        "--num_tokens_m", type=int, default=50, help="number of tokens in millions to train on (e.g. 500 for 500M tokens)"
+    )
 
     args = parser.parse_args()
     return args
@@ -117,15 +126,20 @@ def run_sae_training(
     else:
         save_steps = None
 
+    llm_config = demo_config.LLM_CONFIG[model_name]
     model = AutoModelForCausalLM.from_pretrained(
-        model_name, device_map="auto", torch_dtype=dtype
+        model_name, 
+        device_map="auto", 
+        torch_dtype=dtype,
+        use_safetensors=llm_config.use_safetensors,
+        trust_remote_code=llm_config.trust_remote_code
     )
 
     model = utils.truncate_model(model, layer)
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    submodule = utils.get_submodule(model, layer)
-    submodule_name = f"resid_post_layer_{layer}"
+    submodule = model.transformer.h[layer].mlp.c_proj if model.config.architectures[0] == "GPT2LMHeadModel" else utils.get_submodule(model, layer)
+    submodule_name = f"mlp_out_layer_{layer}"
     io = "out"
     activation_dim = model.config.hidden_size
 
@@ -170,6 +184,7 @@ def run_sae_training(
         layer,
         submodule_name,
         steps,
+        target_l0s=args.target_l0s,
     )
 
     print(f"len trainer configs: {len(trainer_configs)}")
@@ -186,7 +201,7 @@ def run_sae_training(
             save_steps=save_steps,
             save_dir=save_dir,
             log_steps=log_steps,
-            wandb_project=demo_config.wandb_project,
+            wandb_project=demo_config.get_wandb_project(model_name),
             normalize_activations=True,
             verbose=False,
             autocast_dtype=t.bfloat16,
@@ -321,7 +336,20 @@ if __name__ == "__main__":
     hf_repo_id = args.hf_repo_id
 
     if hf_repo_id:
-        assert huggingface_hub.repo_exists(repo_id=hf_repo_id, repo_type="model")
+        try:
+            if not huggingface_hub.repo_exists(repo_id=hf_repo_id, repo_type="model"):
+                print(f"Repository {hf_repo_id} does not exist. Creating it...")
+                huggingface_hub.create_repo(
+                    repo_id=hf_repo_id,
+                    repo_type="model",
+                    private=False,
+                    exist_ok=True
+                )
+                print(f"Created repository {hf_repo_id}")
+        except Exception as e:
+            print(f"Error with HuggingFace repository: {e}")
+            print("Make sure you are logged in to HuggingFace (`huggingface-cli login`)")
+            exit(1)
 
     # This prevents random CUDA out of memory errors
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
@@ -337,7 +365,7 @@ if __name__ == "__main__":
     start_time = time.time()
 
     save_dir = (
-        f"{args.save_dir}_{args.model_name}_{'_'.join(args.architectures)}".replace(
+        f"{args.save_dir}_{args.model_name}_{'_'.join(args.architectures)}_tokens{args.num_tokens_m}M".replace(
             "/", "_"
         )
     )
@@ -349,9 +377,9 @@ if __name__ == "__main__":
             save_dir=save_dir,
             device=args.device,
             architectures=args.architectures,
-            num_tokens=demo_config.num_tokens,
+            num_tokens=args.num_tokens_m * 1_000_000,
             random_seeds=demo_config.random_seeds,
-            dictionary_widths=demo_config.dictionary_widths,
+            dictionary_widths=args.dictionary_widths or demo_config.dictionary_widths,
             learning_rates=demo_config.learning_rates,
             dry_run=args.dry_run,
             use_wandb=args.use_wandb,

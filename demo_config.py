@@ -48,6 +48,8 @@ class LLMConfig:
     context_length: int
     sae_batch_size: int
     dtype: t.dtype
+    use_safetensors: bool = True
+    trust_remote_code: bool = True
 
 
 @dataclass
@@ -57,10 +59,6 @@ class SparsityPenalties:
     p_anneal: list[float]
     gated: list[float]
 
-
-num_tokens = 500_000_000
-
-print(f"NOTE: Training on {num_tokens} tokens")
 
 eval_num_inputs = 200
 random_seeds = [0]
@@ -73,20 +71,46 @@ DECAY_START_FRACTION = 0.8
 
 learning_rates = [3e-4]
 
-wandb_project = "qwen-32b-sweep"
+def get_wandb_project(model_name: str) -> str:
+    # Generate wandb project name from model name.
+    return f"{model_name.replace('/', '-')}"
 
 LLM_CONFIG = {
     "EleutherAI/pythia-70m-deduped": LLMConfig(
-        llm_batch_size=64, context_length=1024, sae_batch_size=2048, dtype=t.float32
+        llm_batch_size=64, context_length=1024, sae_batch_size=2048, dtype=t.float32,
+        use_safetensors=True, trust_remote_code=True
     ),
     "EleutherAI/pythia-160m-deduped": LLMConfig(
-        llm_batch_size=32, context_length=1024, sae_batch_size=2048, dtype=t.float32
+        llm_batch_size=32, context_length=1024, sae_batch_size=2048, dtype=t.float32,
+        use_safetensors=True, trust_remote_code=True
     ),
     "google/gemma-2-2b": LLMConfig(
-        llm_batch_size=4, context_length=1024, sae_batch_size=2048, dtype=t.bfloat16
+        llm_batch_size=4, context_length=1024, sae_batch_size=2048, dtype=t.bfloat16,
+        use_safetensors=True, trust_remote_code=True
+    ),
+    "Qwen/Qwen2.5-0.5B": LLMConfig(
+        llm_batch_size=32, context_length=1024, sae_batch_size=2048, dtype=t.float32,
+        use_safetensors=True, trust_remote_code=True
+    ),
+    "Qwen/Qwen3-0.6B": LLMConfig(
+        llm_batch_size=32, context_length=1024, sae_batch_size=2048, dtype=t.float32,
+        use_safetensors=True, trust_remote_code=True
     ),
     "Qwen/Qwen2.5-Coder-32B-Instruct": LLMConfig(
-        llm_batch_size=4, context_length=2048, sae_batch_size=2048, dtype=t.bfloat16
+        llm_batch_size=4, context_length=2048, sae_batch_size=2048, dtype=t.bfloat16,
+        use_safetensors=True, trust_remote_code=True
+    ),
+    "gpt2-xl": LLMConfig(
+        llm_batch_size=4, context_length=1024, sae_batch_size=2048, dtype=t.float32,
+        use_safetensors=True, trust_remote_code=True
+    ),
+    "EleutherAI/gpt-j-6b": LLMConfig(
+        llm_batch_size=2, context_length=2048, sae_batch_size=2048, dtype=t.bfloat16,
+        use_safetensors=True, trust_remote_code=True
+    ),
+    "unsloth/llama-3-8b": LLMConfig(
+        llm_batch_size=4, context_length=8192, sae_batch_size=2048, dtype=t.bfloat16,
+        use_safetensors=True, trust_remote_code=True
     ),
 }
 
@@ -215,11 +239,13 @@ def get_trainer_configs(
     layer: str,
     submodule_name: str,
     steps: int,
+    target_l0s: list[int] = None,
     warmup_steps: int = WARMUP_STEPS,
     sparsity_warmup_steps: int = SPARSITY_WARMUP_STEPS,
     decay_start_fraction=DECAY_START_FRACTION,
 ) -> list[dict]:
     decay_start = int(steps * decay_start_fraction)
+    target_l0s = target_l0s or TARGET_L0s
 
     trainer_configs = []
 
@@ -303,7 +329,7 @@ def get_trainer_configs(
 
     if TrainerType.TOP_K.value in architectures:
         for seed, dict_size, learning_rate, k in itertools.product(
-            seeds, dict_sizes, learning_rates, TARGET_L0s
+            seeds, dict_sizes, learning_rates, target_l0s
         ):
             config = TopKTrainerConfig(
                 **base_config,
@@ -319,7 +345,7 @@ def get_trainer_configs(
 
     if TrainerType.BATCH_TOP_K.value in architectures:
         for seed, dict_size, learning_rate, k in itertools.product(
-            seeds, dict_sizes, learning_rates, TARGET_L0s
+            seeds, dict_sizes, learning_rates, target_l0s
         ):
             config = TopKTrainerConfig(
                 **base_config,
@@ -335,7 +361,7 @@ def get_trainer_configs(
 
     if TrainerType.Matryoshka_BATCH_TOP_K.value in architectures:
         for seed, dict_size, learning_rate, k in itertools.product(
-            seeds, dict_sizes, learning_rates, TARGET_L0s
+            seeds, dict_sizes, learning_rates, target_l0s
         ):
             config = MatryoshkaBatchTopKTrainerConfig(
                 **base_config,
@@ -351,7 +377,7 @@ def get_trainer_configs(
 
     if TrainerType.JUMP_RELU.value in architectures:
         for seed, dict_size, learning_rate, target_l0 in itertools.product(
-            seeds, dict_sizes, learning_rates, TARGET_L0s
+            seeds, dict_sizes, learning_rates, target_l0s
         ):
             config = JumpReluTrainerConfig(
                 **base_config,
